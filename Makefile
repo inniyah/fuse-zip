@@ -11,6 +11,7 @@ LIBS=-Llib -lfusezip $(shell $(PKG_CONFIG) fuse --libs) $(shell $(PKG_CONFIG) li
 LIB=lib/libfusezip.a
 CXXFLAGS=-g -O0 -Wall -Wextra -Wconversion -Wsign-conversion -Wlogical-op -Wshadow -pedantic -Werror -std=c++11
 RELEASE_CXXFLAGS=-O2 -Wall -Wextra -Wconversion -Wsign-conversion -Wlogical-op -Wshadow -pedantic -Werror -std=c++11
+RELEASE_LDFLAGS=
 PKG_CONFIG?=pkg-config
 FUSEFLAGS=$(shell $(PKG_CONFIG) fuse --cflags)
 ZIPFLAGS=$(shell $(PKG_CONFIG) libzip --cflags)
@@ -59,7 +60,7 @@ $(MAN): $(MANSRC)
 man-clean:
 	rm -f $(MANSRC).gz
 
-install: all doc
+install: release
 	mkdir -p "$(DESTDIR)$(bindir)/"
 	$(INSTALL_PROGRAM) "$(DEST)" "$(DESTDIR)$(bindir)/"
 	mkdir -p "$(DESTDIR)$(docdir)/"
@@ -82,7 +83,7 @@ tarball-clean:
 	rm -f fuse-zip-*.tar.gz fuse-zip-tests-*.tar.gz
 
 release:
-	$(MAKE) CXXFLAGS="$(RELEASE_CXXFLAGS)" all doc
+	$(MAKE) CXXFLAGS="$(RELEASE_CXXFLAGS)" LDFLAGS="$(RELEASE_LDFLAGS)" all doc
 
 check: $(DEST)
 	$(MAKE) -C tests

@@ -30,6 +30,9 @@
 
 #include "bigBuffer.h"
 
+const char *BigBuffer::passwd = NULL;
+
+
 /**
  * Class that keep chunk of file data.
  */
@@ -161,7 +164,8 @@ BigBuffer::BigBuffer(): len(0) {
 
 BigBuffer::BigBuffer(struct zip *z, zip_uint64_t nodeId, size_t length):
         len(length) {
-    struct zip_file *zf = zip_fopen_index(z, nodeId, 0);
+    int zep = 0;
+    struct zip_file *zf = open(z, nodeId, &zep);
     if (zf == NULL) {
         syslog(LOG_WARNING, "%s", zip_strerror(z));
         throw std::runtime_error(zip_strerror(z));
@@ -199,6 +203,26 @@ BigBuffer::BigBuffer(struct zip *z, zip_uint64_t nodeId, size_t length):
 }
 
 BigBuffer::~BigBuffer() {
+}
+
+struct zip_file *BigBuffer::open(struct zip *z, zip_uint64_t nodeId, int *zep) {
+    struct zip_file *zf;
+
+    if (passwd != NULL) {
+        zf = zip_fopen_index_encrypted(z, nodeId, 0, passwd);
+    }
+    else {
+        zf = zip_fopen_index(z, nodeId, 0);
+        if (zf == NULL) {
+            int sep;
+            zip_error_get(z, zep, &sep);
+            if (ZIP_ER_NOPASSWD == *zep) {
+                zf = zip_fopen_index_encrypted(z, nodeId, 0, passwd);
+            }
+        }
+    }
+
+    return zf;
 }
 
 int BigBuffer::read(char *buf, size_t size, size_t offset) const {

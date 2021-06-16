@@ -21,6 +21,7 @@
 #define KEY_VERSION (1)
 #define KEY_RO (2)
 #define KEY_FORCE_PRECISE_TIME (3)
+#define KEY_USE_PASSWD (4)
 
 #include "config.h"
 
@@ -58,6 +59,7 @@ void print_usage() {
             "    -V   --version         print version\n"
             "    -r   -o ro             open archive in read-only mode\n"
             "    -f                     don't detach from terminal\n"
+            "    -p                     use password\n"
             "    -d                     turn on debugging, also implies -f\n"
             "\n");
 }
@@ -86,6 +88,8 @@ struct fusezip_param {
     bool readonly;
     // force precise time
     bool force_precise_time;
+    // optional, use passwd
+    bool usePasswd;
 };
 
 /**
@@ -127,6 +131,11 @@ static int process_arg(void *data, const char *arg, int key, struct fuse_args *o
 
         case KEY_FORCE_PRECISE_TIME: {
             param->force_precise_time = true;
+            return DISCARD;
+        }
+
+        case KEY_USE_PASSWD: {
+            param->usePasswd = true;
             return DISCARD;
         }
 
@@ -188,6 +197,7 @@ static const struct fuse_opt fusezip_opts[] = {
     FUSE_OPT_KEY("-r",                  KEY_RO),
     FUSE_OPT_KEY("ro",                  KEY_RO),
     FUSE_OPT_KEY("force_precise_time",  KEY_FORCE_PRECISE_TIME),
+    FUSE_OPT_KEY("-p",                  KEY_USE_PASSWD),
     {NULL, 0, 0}
 };
 
@@ -204,6 +214,7 @@ int main(int argc, char *argv[]) {
     param.readonly = false;
     param.force_precise_time = false;
     param.strArgCount = 0;
+    param.usePasswd = false;
     param.fileName = NULL;
 
     if (fuse_opt_parse(&args, &param, fusezip_opts, process_arg)) {
@@ -242,9 +253,25 @@ int main(int argc, char *argv[]) {
             fuse_opt_free_args(&args);
             return EXIT_FAILURE;
         }
+        // try password
+        if (param.usePasswd) {
+            int try_count = 3;
+            while (try_count--) {
+                if (data->try_passwd(getpass("Enter password: "))) {
+                    break;
+                }
+                fprintf(stderr,"Incorrect!\n");
+            }
+            if (try_count < 0) {
+                fuse_opt_free_args(&args);
+                fprintf(stderr,"%s quit!\n", PROGRAM);
+                return EXIT_FAILURE;
+            }
+        }
     }
 
     static struct fuse_operations fusezip_oper;
+    /* {{{ */
     fusezip_oper.init       =   fusezip_init;
     fusezip_oper.destroy    =   fusezip_destroy;
     fusezip_oper.readdir    =   fusezip_readdir;
@@ -285,6 +312,7 @@ int main(int argc, char *argv[]) {
     fusezip_oper.flag_utime_omit_ok = 1;
 #   endif
 #endif
+    /* }}} */
 
     struct fuse *fuse;
     char *mountpoint;
@@ -302,4 +330,4 @@ int main(int argc, char *argv[]) {
     fuse_teardown(fuse, mountpoint);
     return (res == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
+/* vim:set st=4 sw=4 et fdm=marker: */
